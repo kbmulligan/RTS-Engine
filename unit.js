@@ -1,4 +1,8 @@
 const TAU = 2 * Math.PI;
+const DEFAULT_HP = 10;
+const DEFAULT_ATTACK = 10;
+const DEFAULT_DEFENSE = 10;
+
 function Unit(x, y, r=8) {
   this.x = x;
   this.y = y;
@@ -11,6 +15,10 @@ function Unit(x, y, r=8) {
   this.selected = false;
   this.field = getField(Math.floor(this.y/B), Math.floor(this.x/B));
 
+  this.hp = DEFAULT_HP;
+  this.attack = DEFAULT_ATTACK;
+  this.defense = DEFAULT_DEFENSE;
+  
   this.getLocation = function() {
     return {x: this.x, y: this.y};
   }
