@@ -243,9 +243,11 @@ window.onresize = function(e) {
 
 window.onkeydown = function (e) {
   keys[e.keyCode] = true;
+  console.log("Key down:", e.keyCode);
 }
 
 window.onkeyup = function (e) {
   keys[e.keyCode] = false;
+  console.log("Key up:", e.keyCode);
 }
 </script>
