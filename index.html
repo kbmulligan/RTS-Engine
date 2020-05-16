@@ -41,6 +41,8 @@ var selectionBox = {
   }
 };
 
+const MAX_UNITS = 10;
+  
 const W = 540
 const B = 18;
 const S = W/B; //30
@@ -50,7 +52,7 @@ canvas.height = W;
 var player = {
   units: []
 }
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < MAX_UNITS; i++) {
   let x = Math.floor(Math.random() * W)
   let y = Math.floor(Math.random() * W)
   player.units.push(new Unit(x, y))
