@@ -1,5 +1,11 @@
 const TAU = 2 * Math.PI;
-function Unit(x, y, r=8) {
+const DEFAULT_HP = 10;
+const DEFAULT_ATTACK = 10;
+const DEFAULT_DEFENSE = 10;
+const DEFAULT_COLOR = "gray";
+const DEFAULT_SIZE = 8;
+
+function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.x = x;
   this.y = y;
   this.r = r;
@@ -7,10 +13,14 @@ function Unit(x, y, r=8) {
   this.vy = 0;
   this.maxv = 1;
   this.target = {x: this.x, y: this.y};
-  this.color = "blue";
+  this.color = color;
   this.selected = false;
   this.field = getField(Math.floor(this.y/B), Math.floor(this.x/B));
 
+  this.hp = DEFAULT_HP;
+  this.attack = DEFAULT_ATTACK;
+  this.defense = DEFAULT_DEFENSE;
+  
   this.getLocation = function() {
     return {x: this.x, y: this.y};
   }

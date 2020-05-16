@@ -41,21 +41,40 @@ var selectionBox = {
   }
 };
 
+const MAX_UNITS = 6;
+  
 const W = 540
 const B = 18;
 const S = W/B; //30
 canvas.width = W;
 canvas.height = W;
 
-var player = {
+var player1 = {
+  name: "Player1",
+  color: "blue",
   units: []
-}
-for (let i = 0; i < 8; i++) {
+};
+
+for (let i = 0; i < MAX_UNITS; i++) {
   let x = Math.floor(Math.random() * W)
   let y = Math.floor(Math.random() * W)
-  player.units.push(new Unit(x, y))
+  player1.units.push(new Unit(x, y, player1.color))
+}
+  
+var player2 = {
+  name: "Player 2",
+  color: "green",
+  units: []
+};
+  
+for (let i = 0; i < MAX_UNITS; i++) {
+  let x = Math.floor(Math.random() * W)
+  let y = Math.floor(Math.random() * W)
+  player2.units.push(new Unit(x, y, player2.color))
 }
 
+var playerActive = player1;
+setActivePlayer(player1);
 
 function getColor(n){
   if (n == 0) return "black"
@@ -63,6 +82,18 @@ function getColor(n){
   return 'white'
 }
 
+function switchActivePlayer () {
+  if (playerActive.name == "Player1") {
+    setActivePlayer(player2);
+  } else {
+    setActivePlayer(player1);
+  }
+}
+  
+function setActivePlayer (newActive) {
+  playerActive = newActive; 
+  console.log("New active player:", playerActive.name);
+}
 
 function draw() {
   
@@ -96,7 +127,8 @@ function draw() {
 
   
 
-  player.units.forEach(unit => unit.draw(ctx));
+  player1.units.forEach(unit => unit.draw(ctx));
+  player2.units.forEach(unit => unit.draw(ctx));
   drawSelectionBox(ctx);
 
 }
@@ -116,7 +148,8 @@ function drawSelectionBox(ctx) {
 }
 
 function update() {
-  player.units.forEach(unit => unit.update());
+  player1.units.forEach(unit => unit.update());
+  player2.units.forEach(unit => unit.update());
 }
 
 function tick(t) {
@@ -178,7 +211,7 @@ canvas.onmouseup = function(e) {
     if (selectionBox.active) {
       selectionBox.pt2 = {x, y};
       selectionBox.active = false;
-      for (let unit of player.units) {
+      for (let unit of playerActive.units) {
         if (selectionBox.contains(unit.x, unit.y)) {
           unit.selected = true
         } else {
@@ -186,9 +219,9 @@ canvas.onmouseup = function(e) {
         }
       }
     } else {
-      let unit = getUnit(player, x, y);
+      let unit = getUnit(playerActive, x, y);
       if (!keys[16]) {
-        player.units.forEach(unit => unit.selected = false)
+        playerActive.units.forEach(unit => unit.selected = false)
       }
       if (unit !== null) {
         unit.selected = true;
@@ -204,7 +237,7 @@ canvas.oncontextmenu = function(e) {
   let y = Math.round(getCanvasPosition(e.offsetY));
   let j = Math.floor(x / B);
   let i = Math.floor(y / B);
-  for (let unit of player.units) {
+  for (let unit of playerActive.units) {
     if (unit.selected) {
       unit.target = {x, y}
       unit.field = getField(i, j)
@@ -225,9 +258,14 @@ window.onresize = function(e) {
 
 window.onkeydown = function (e) {
   keys[e.keyCode] = true;
+  console.log("Key down:", e.keyCode);
+  if (keys[83]) {                           //  's' key
+    switchActivePlayer();
+  }
 }
 
 window.onkeyup = function (e) {
   keys[e.keyCode] = false;
+  console.log("Key up:", e.keyCode);
 }
 </script>
