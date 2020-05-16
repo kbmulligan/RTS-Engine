@@ -16,10 +16,15 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.color = color;
   this.selected = false;
   this.field = getField(Math.floor(this.y/B), Math.floor(this.x/B));
+  this.direction = 0.0 * Math.PI;
 
+  this.type = "SOLDIER";     // one of SOLDIER, ARCHER
+  this.name = this.color + this.type + this.x + this.y; 
   this.hp = DEFAULT_HP;
   this.attack = DEFAULT_ATTACK;
   this.defense = DEFAULT_DEFENSE;
+
+  this.state = "INACTIVE";    // one of INACTIVE, MOVING, ATTACKING
   
   this.getLocation = function() {
     return {x: this.x, y: this.y};
@@ -37,12 +42,24 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.draw = function(ctx) {
     ctx.fillStyle = this.color;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, TAU);
+    ctx.arc(this.x, this.y, this.r, this.direction+0.10*TAU, this.direction+TAU-0.10*TAU);
+    ctx.lineTo(this.x, this.y);
     ctx.fill();
     if (this.selected) {
-      ctx.strokeStyle = 'yellow';
+      ctx.strokeStyle = "yellow";
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, TAU);
       let temp = ctx.lineWidth;
       ctx.lineWidth = 4
+      ctx.stroke();
+      ctx.lineWidth = temp;
+    }
+    if (this.state == "ATTACKING") {
+      ctx.strokeStyle = "red";
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, TAU);
+      let temp = ctx.lineWidth;
+      ctx.lineWidth = 6
       ctx.stroke();
       ctx.lineWidth = temp;
     }
@@ -79,6 +96,7 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
       this.vy = dy * this.maxv;
       this.x += this.vx;
       this.y += this.vy;
+
       return
     }
 
@@ -114,6 +132,9 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
 
     this.x += this.vx;
     this.y += this.vy;
+    
+    this.direction = Math.atan2(this.vy, this.vx);
+    console.log(this.direction, this.x, this.y);
   }
 }
 

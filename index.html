@@ -19,6 +19,8 @@ var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d')
 var keys = {};
 var done = false;
+var gameState = "PAUSED";
+var sayKeys = false;
 
 var selectionBox = {
   pt1: {
@@ -41,9 +43,13 @@ var selectionBox = {
   }
 };
 
+const KEY_SPACE = 32;
+const KEY_S = 83;
+const KEY_SHIFT = 16;
+
 const MAX_UNITS = 6;
   
-const W = 540
+const W = 540; 
 const B = 18;
 const S = W/B; //30
 canvas.width = W;
@@ -152,6 +158,14 @@ function update() {
   player2.units.forEach(unit => unit.update());
 }
 
+function togglePause() {
+    if (gameState == "PAUSED") {
+        gameState = "RUNNING";
+    } else { 
+        gameState = "PAUSED";
+    }
+}
+
 function tick(t) {
   draw();
   update();
@@ -169,22 +183,6 @@ function getUnit(player, x, y) {
   return null;
 }
 
-// canvas.onclick = function(e) {
-//   e.preventDefault();
-//   let x = Math.round(getCanvasPosition(e.offsetX));
-//   let y = Math.round(getCanvasPosition(e.offsetY));
-//   let unit = getUnit(player, x, y);
-//   if (unit !== null) {
-//     unit.selected = !unit.selected;
-//     return;
-//   } else {
-//     player.units.forEach(unit => unit.selected = false)
-//   }
-
-//   // let j = Math.floor(x / B);
-//   // let i = Math.floor(y / B);
-//   // map[i][j] = 1;
-// }
 
 canvas.onmousedown = function(e) {
   keys[e.button] = true;
@@ -215,12 +213,12 @@ canvas.onmouseup = function(e) {
         if (selectionBox.contains(unit.x, unit.y)) {
           unit.selected = true
         } else {
-          unit.selected = keys[16] && unit.selected;
+          unit.selected = keys[KEY_SHIFT] && unit.selected;
         }
       }
     } else {
       let unit = getUnit(playerActive, x, y);
-      if (!keys[16]) {
+      if (!keys[KEY_SHIFT]) {
         playerActive.units.forEach(unit => unit.selected = false)
       }
       if (unit !== null) {
@@ -237,10 +235,12 @@ canvas.oncontextmenu = function(e) {
   let y = Math.round(getCanvasPosition(e.offsetY));
   let j = Math.floor(x / B);
   let i = Math.floor(y / B);
+  let field = getField(i, j);
+
   for (let unit of playerActive.units) {
     if (unit.selected) {
       unit.target = {x, y}
-      unit.field = getField(i, j)
+      unit.field = field;
     }
   }
 }
@@ -258,14 +258,22 @@ window.onresize = function(e) {
 
 window.onkeydown = function (e) {
   keys[e.keyCode] = true;
-  console.log("Key down:", e.keyCode);
-  if (keys[83]) {                           //  's' key
+
+  if (sayKeys) {
+     console.log("Key down:", e.keyCode);
+  }
+  if (keys[KEY_S]) {                           //  's' key
     switchActivePlayer();
+  }
+  if (keys[KEY_SPACE]) {
+    togglePause();
   }
 }
 
 window.onkeyup = function (e) {
   keys[e.keyCode] = false;
-  console.log("Key up:", e.keyCode);
+  if (sayKeys) {
+    console.log("Key up:", e.keyCode);
+  }
 }
 </script>
