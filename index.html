@@ -50,7 +50,8 @@ canvas.width = W;
 canvas.height = W;
 
 var player1 = {
-  color: 'blue',
+  name: "Player1",
+  color: "blue",
   units: []
 };
 
@@ -61,7 +62,8 @@ for (let i = 0; i < MAX_UNITS; i++) {
 }
   
 var player2 = {
-  color: 'green',
+  name: "Player 2",
+  color: "green",
   units: []
 };
   
@@ -72,6 +74,7 @@ for (let i = 0; i < MAX_UNITS; i++) {
 }
 
 var playerActive = player1;
+setActivePlayer(player1);
 
 function getColor(n){
   if (n == 0) return "black"
@@ -79,6 +82,18 @@ function getColor(n){
   return 'white'
 }
 
+function switchActivePlayer () {
+  if (playerActive.name == "Player1") {
+    setActivePlayer(player2);
+  } else {
+    setActivePlayer(player1);
+  }
+}
+  
+function setActivePlayer (newActive) {
+  playerActive = newActive; 
+  console.log("New active player:", playerActive.name);
+}
 
 function draw() {
   
@@ -244,6 +259,9 @@ window.onresize = function(e) {
 window.onkeydown = function (e) {
   keys[e.keyCode] = true;
   console.log("Key down:", e.keyCode);
+  if (keys[83]) {                           //  's' key
+    switchActivePlayer();
+  }
 }
 
 window.onkeyup = function (e) {
