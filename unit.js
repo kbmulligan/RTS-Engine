@@ -3,8 +3,9 @@ const DEFAULT_HP = 10;
 const DEFAULT_ATTACK = 10;
 const DEFAULT_DEFENSE = 10;
 const DEFAULT_COLOR = "gray";
+const DEFAULT_SIZE = 8;
 
-function Unit(x, y, color, r=8) {
+function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.x = x;
   this.y = y;
   this.r = r;
