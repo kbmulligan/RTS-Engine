@@ -41,7 +41,7 @@ var selectionBox = {
   }
 };
 
-const MAX_UNITS = 10;
+const MAX_UNITS = 6;
   
 const W = 540
 const B = 18;
@@ -50,12 +50,25 @@ canvas.width = W;
 canvas.height = W;
 
 var player = {
+  color: 'blue',
   units: []
-}
+};
+
 for (let i = 0; i < MAX_UNITS; i++) {
   let x = Math.floor(Math.random() * W)
   let y = Math.floor(Math.random() * W)
-  player.units.push(new Unit(x, y))
+  player.units.push(new Unit(x, y, player.color))
+}
+  
+var player2 = {
+  color: 'green',
+  units: []
+};
+  
+for (let i = 0; i < MAX_UNITS; i++) {
+  let x = Math.floor(Math.random() * W)
+  let y = Math.floor(Math.random() * W)
+  player2.units.push(new Unit(x, y, player2.color))
 }
 
 
