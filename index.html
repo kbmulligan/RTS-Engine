@@ -49,7 +49,7 @@ const S = W/B; //30
 canvas.width = W;
 canvas.height = W;
 
-var player = {
+var player1 = {
   color: 'blue',
   units: []
 };
@@ -57,7 +57,7 @@ var player = {
 for (let i = 0; i < MAX_UNITS; i++) {
   let x = Math.floor(Math.random() * W)
   let y = Math.floor(Math.random() * W)
-  player.units.push(new Unit(x, y, player.color))
+  player1.units.push(new Unit(x, y, player1.color))
 }
   
 var player2 = {
@@ -71,6 +71,7 @@ for (let i = 0; i < MAX_UNITS; i++) {
   player2.units.push(new Unit(x, y, player2.color))
 }
 
+var playerActive = player1;
 
 function getColor(n){
   if (n == 0) return "black"
@@ -111,7 +112,7 @@ function draw() {
 
   
 
-  player.units.forEach(unit => unit.draw(ctx));
+  player1.units.forEach(unit => unit.draw(ctx));
   player2.units.forEach(unit => unit.draw(ctx));
   drawSelectionBox(ctx);
 
@@ -132,7 +133,8 @@ function drawSelectionBox(ctx) {
 }
 
 function update() {
-  player.units.forEach(unit => unit.update());
+  player1.units.forEach(unit => unit.update());
+  player2.units.forEach(unit => unit.update());
 }
 
 function tick(t) {
@@ -194,7 +196,7 @@ canvas.onmouseup = function(e) {
     if (selectionBox.active) {
       selectionBox.pt2 = {x, y};
       selectionBox.active = false;
-      for (let unit of player.units) {
+      for (let unit of playerActive.units) {
         if (selectionBox.contains(unit.x, unit.y)) {
           unit.selected = true
         } else {
@@ -202,9 +204,9 @@ canvas.onmouseup = function(e) {
         }
       }
     } else {
-      let unit = getUnit(player, x, y);
+      let unit = getUnit(playerActive, x, y);
       if (!keys[16]) {
-        player.units.forEach(unit => unit.selected = false)
+        playerActive.units.forEach(unit => unit.selected = false)
       }
       if (unit !== null) {
         unit.selected = true;
@@ -220,7 +222,7 @@ canvas.oncontextmenu = function(e) {
   let y = Math.round(getCanvasPosition(e.offsetY));
   let j = Math.floor(x / B);
   let i = Math.floor(y / B);
-  for (let unit of player.units) {
+  for (let unit of playerActive.units) {
     if (unit.selected) {
       unit.target = {x, y}
       unit.field = getField(i, j)
