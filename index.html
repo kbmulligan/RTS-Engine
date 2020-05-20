@@ -23,7 +23,7 @@ var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d')
 var keys = {};
 var done = false;
-var gameState = "PAUSED";
+var gameState = "PAUSED";               // one of "PAUSED" or "RUNNING"
 var sayKeys = true;
 var inputMode = "NORMAL";               // one of "NORMAL" or "ATTACK"
 var gameTime = 0;
@@ -69,6 +69,7 @@ canvas.height = W;
 const DARK_GRAY = "#333";
 const LIGHT_GRAY = "#BBB";
 
+// PLAYERS AND INITIAL TROOP COUNTS /////////////////////////////////
 var player1 = {
   name: "Player 1",
   color: "blue",
@@ -95,12 +96,7 @@ for (let i = 0; i < MAX_UNITS; i++) {
 
 var playerActive = player1;
 
-function getColor(n){
-  let color = "white";
-  if (n == 0) color = "lightgray";
-  if (n == 1) color = "brown";
-  return color; 
-}
+// UTILITY FUNCTIONS /////////////////////////////////////////////////
 
 function switchActivePlayer () {
   if (playerActive.name == "Player 1") {
@@ -109,7 +105,7 @@ function switchActivePlayer () {
     setActivePlayer(player1);
   }
 }
-  
+ 
 function setActivePlayer (newActive) {
   playerActive = newActive; 
   console.log("New active player:", playerActive.name);
@@ -126,6 +122,7 @@ function getOpponent (player) {
   return oppo;
 }
 
+// HIGH LEVEL DRAW FUNCTIONS ////////////////////////////////////////
 function draw() {
   
   drawMap(ctx);  
@@ -178,21 +175,14 @@ function drawSelectionBox(ctx) {
 
 }
 
+// ASSET UPDATES ////////////////////////////////////////////////////
 function update() {
   player1.units.forEach(unit => unit.update());
   player2.units.forEach(unit => unit.update());
 }
 
-function togglePause() {
-    if (gameState == "PAUSED") {
-        gameState = "RUNNING";
-        console.log("GAME RUNNING...");
-    } else { 
-        gameState = "PAUSED";
-        console.log("GAME PAUSED...");
-    }
-}
 
+// MAIN GAME LOOP ///////////////////////////////////////////////////
 function tick(t) {
   if (gameState == "RUNNING") {
       gameTime += GAME_SPEED;
@@ -203,15 +193,17 @@ function tick(t) {
   if (!done) requestAnimationFrame(tick);
 }
 
-// START HERE /////////////////////////////////////
+// START HERE ///////////////////////////////////////////////////////
+// Everything begins here then goes into main game loop 
 
 console.log("MAP: ", mapName);
 console.log("GAMESTATE: ", gameState);
 setActivePlayer(player1);
+showGameState();
 
 requestAnimationFrame(tick);
 
-///////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////
 
 function getUnit(player, x, y) {
   for (let unit of player.units) {
@@ -222,20 +214,72 @@ function getUnit(player, x, y) {
   return null;
 }
 
+// stops movement for selected units by removing attack targets 
+// and move targets
 function stopUnits () {
 
   for (let unit of playerActive.units) {
     if (unit.selected) {
-      unit.target = null;
-      unit.targetAttack = null;
+      unit.setMoveTarget(null);
+      unit.setAttackTarget(null); 
       console.log("STOP CMD ISSUED: ", unit.name);
     }
   }
 
 }
 
+// issues move order to given units by setting their targets to x, y
+function moveUnits (units, x, y) {
+
+    // get movement flowfield to prep for pathfinding (generate once)
+    let j = Math.floor(x / B);
+    let i = Math.floor(y / B);
+    let field = getField(i, j);
+    
+    for (let unit of units) {
+        unit.field = field;
+        unit.setMoveTarget({x, y});
+        console.log("MOVE CMD ISSUED: ", unit.name, x, y);
+    }
+
+}
+
+
+ 
+function togglePause() {
+    if (gameState == "PAUSED") {
+        gameState = "RUNNING";
+        console.log("GAME RUNNING...");
+    } else { 
+        gameState = "PAUSED";
+        console.log("GAME PAUSED...");
+    }
+}
+
+// INPUT OUTPUT /////////////////////////////////////////////////////
 canvas.onmousedown = function(e) {
   keys[e.button] = true;
+  if (e.button == 0) {
+    let x = Math.round(getCanvasPosition(e.offsetX));
+    let y = Math.round(getCanvasPosition(e.offsetY));
+    selectionBox.pt1 = {x, y};
+  }
+
+}
+
+canvas.onmousemove = function(e) {
+  if (keys[0]) {
+    selectionBox.active = true;
+    let x = Math.round(getCanvasPosition(e.offsetX));
+    let y = Math.round(getCanvasPosition(e.offsetY));
+    selectionBox.pt2 = {x, y};
+  }
+
+}
+
+canvas.onmouseup = function(e) {
+  keys[e.button] = false;
+
   if (e.button == 0 && inputMode == "ATTACK") {
       let x = Math.round(getCanvasPosition(e.offsetX));
       let y = Math.round(getCanvasPosition(e.offsetY));
@@ -254,45 +298,28 @@ canvas.onmousedown = function(e) {
       if (e.button == 0) {
         let x = Math.round(getCanvasPosition(e.offsetX));
         let y = Math.round(getCanvasPosition(e.offsetY));
-        selectionBox.pt1 = {x, y};
-      }
-  } 
-}
-
-canvas.onmousemove = function(e) {
-  if (keys[0]) {
-    selectionBox.active = true;
-    let x = Math.round(getCanvasPosition(e.offsetX));
-    let y = Math.round(getCanvasPosition(e.offsetY));
-    selectionBox.pt2 = {x, y};
-  }
-}
-canvas.onmouseup = function(e) {
-  keys[e.button] = false;
-  if (e.button == 0) {
-    let x = Math.round(getCanvasPosition(e.offsetX));
-    let y = Math.round(getCanvasPosition(e.offsetY));
-    if (selectionBox.active) {
-      selectionBox.pt2 = {x, y};
-      selectionBox.active = false;
-      for (let unit of playerActive.units) {
-        if (selectionBox.contains(unit.x, unit.y)) {
-          unit.selected = true
+        if (selectionBox.active) {
+          selectionBox.pt2 = {x, y};
+          selectionBox.active = false;
+          for (let unit of playerActive.units) {
+            if (selectionBox.contains(unit.x, unit.y)) {
+              unit.selected = true
+            } else {
+              unit.selected = keys[KEY_SHIFT] && unit.selected;
+            }
+          }
         } else {
-          unit.selected = keys[KEY_SHIFT] && unit.selected;
+          let unit = getUnit(playerActive, x, y);
+          if (!keys[KEY_SHIFT]) {
+            playerActive.units.forEach(unit => unit.selected = false)
+          }
+          if (unit !== null) {
+            unit.selected = true;
+            console.log(unit);
+            return;
+          }
         }
       }
-    } else {
-      let unit = getUnit(playerActive, x, y);
-      if (!keys[KEY_SHIFT]) {
-        playerActive.units.forEach(unit => unit.selected = false)
-      }
-      if (unit !== null) {
-        unit.selected = true;
-        console.log(unit);
-        return;
-      }
-    }
   }
 }
 
@@ -300,17 +327,12 @@ canvas.oncontextmenu = function(e) {
   e.preventDefault();
   let x = Math.round(getCanvasPosition(e.offsetX));
   let y = Math.round(getCanvasPosition(e.offsetY));
-  let j = Math.floor(x / B);
-  let i = Math.floor(y / B);
-  let field = getField(i, j);
 
-  for (let unit of playerActive.units) {
-    if (unit.selected) {
-      unit.target = {x, y}
-      unit.field = field;
-      console.log("MOVE CMD ISSUED: ", unit.name, x, y);
-    }
-  }
+  let selectedUnits = playerActive.units.filter( function(unit) {
+      return unit.selected;
+  }); 
+
+  moveUnits(selectedUnits, x, y);
 }
 
 function getCanvasPosition(clientPos) {
@@ -318,19 +340,20 @@ function getCanvasPosition(clientPos) {
   return Math.round(clientPos * ratio);
 }
 
-
 window.onresize = function(e) {
   canvas.width = W;
   canvas.height = W;
 }
 
+// KEYBOARD IO //////////////////////////////////////////////////////
 window.onkeydown = function (e) {
   keys[e.keyCode] = true;
 
   if (sayKeys) {
       console.log("Key down:", e.keyCode);
   }
-  if (keys[KEY_TILDE]) {                           //  's' key
+
+  if (keys[KEY_TILDE]) {                           
       switchActivePlayer();
   }
   if (keys[KEY_SPACE]) {
@@ -343,6 +366,9 @@ window.onkeydown = function (e) {
   if (keys[KEY_S]) {
       stopUnits(); 
   }
+  if (keys[KEY_H]) {
+      stopUnits(); 
+  }
 
 }
 
@@ -351,8 +377,34 @@ window.onkeyup = function (e) {
   if (sayKeys) {
     console.log("Key up:", e.keyCode);
   }
-
-
 }
+
+// GAME STATE ///////////////////////////////////////////////////////
+function showGameState () {
+    let gameStateInfo = "GAME STATE INFO";
+    let mapInfo = mapName;
+    
+    let playerInfo = player1.name + " " + player2.name;
+
+    let unitInfo = "";  
+    for (let unit of player1.units) {
+        unitInfo += unit.name + " " ;
+    }
+    for (let unit of player2.units) {
+        unitInfo += unit.name + " " ;
+    }
+
+
+    console.log("--- GAME STATE ---");
+    console.log(mapInfo);
+    console.log(playerInfo);
+    console.log(unitInfo);
+
+    return gameStateInfo; 
+}
+
+
+
+
 </script>
 </html>
