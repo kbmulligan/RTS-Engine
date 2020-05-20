@@ -1,5 +1,7 @@
+<html>
 <head>
   <title>RTS Engine</title>
+  <meta charset="UTF-8">
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
 <body>
@@ -22,7 +24,7 @@ var ctx = canvas.getContext('2d')
 var keys = {};
 var done = false;
 var gameState = "PAUSED";
-var sayKeys = false;
+var sayKeys = true;
 var inputMode = "NORMAL";               // one of "NORMAL" or "ATTACK"
 var gameTime = 0;
 
@@ -49,10 +51,12 @@ var selectionBox = {
   }
 };
 
-const KEY_SPACE = 32;
-const KEY_S = 83;
-const KEY_SHIFT = 16;
-const KEY_A = 65;
+const KEY_SPACE = 32;                // pause
+const KEY_SHIFT = 16;                // add to selection
+const KEY_TILDE = 192;               // switch players
+const KEY_A = 65;                    // attack
+const KEY_S = 83;                    // stop
+const KEY_H = 72;                    // hold position
 
 const MAX_UNITS = 5;
   
@@ -66,7 +70,7 @@ const DARK_GRAY = "#333";
 const LIGHT_GRAY = "#BBB";
 
 var player1 = {
-  name: "Player1",
+  name: "Player 1",
   color: "blue",
   units: []
 };
@@ -90,7 +94,6 @@ for (let i = 0; i < MAX_UNITS; i++) {
 }
 
 var playerActive = player1;
-setActivePlayer(player1);
 
 function getColor(n){
   let color = "white";
@@ -100,7 +103,7 @@ function getColor(n){
 }
 
 function switchActivePlayer () {
-  if (playerActive.name == "Player1") {
+  if (playerActive.name == "Player 1") {
     setActivePlayer(player2);
   } else {
     setActivePlayer(player1);
@@ -110,6 +113,17 @@ function switchActivePlayer () {
 function setActivePlayer (newActive) {
   playerActive = newActive; 
   console.log("New active player:", playerActive.name);
+}
+
+// return opponent given a player
+function getOpponent (player) {
+  var oppo = null;
+  if (player.name == "Player 1") {
+    oppo = player2;
+  } else {
+    oppo = player1;
+  }
+  return oppo;
 }
 
 function draw() {
@@ -137,6 +151,17 @@ function drawMap (ctx) {
     }
   }
 
+  // draw border when paused
+  if (gameState == "PAUSED") {
+     ctx.strokeStyle = "ORANGE";
+     ctx.beginPath();
+     ctx.rect(0, 0, W, W);
+     let temp = ctx.lineWidth;
+     ctx.lineWidth = 15;
+     ctx.stroke();
+     ctx.lineWidth = temp;
+  }
+
 }
 
 function drawSelectionBox(ctx) {
@@ -161,19 +186,32 @@ function update() {
 function togglePause() {
     if (gameState == "PAUSED") {
         gameState = "RUNNING";
+        console.log("GAME RUNNING...");
     } else { 
         gameState = "PAUSED";
+        console.log("GAME PAUSED...");
     }
 }
 
 function tick(t) {
-  gameTime += GAME_SPEED;
+  if (gameState == "RUNNING") {
+      gameTime += GAME_SPEED;
+      update();
+  }   
+
   draw();
-  update();
   if (!done) requestAnimationFrame(tick);
 }
 
+// START HERE /////////////////////////////////////
+
+console.log("MAP: ", mapName);
+console.log("GAMESTATE: ", gameState);
+setActivePlayer(player1);
+
 requestAnimationFrame(tick);
+
+///////////////////////////////////////////////////
 
 function getUnit(player, x, y) {
   for (let unit of player.units) {
@@ -184,6 +222,17 @@ function getUnit(player, x, y) {
   return null;
 }
 
+function stopUnits () {
+
+  for (let unit of playerActive.units) {
+    if (unit.selected) {
+      unit.target = null;
+      unit.targetAttack = null;
+      console.log("STOP CMD ISSUED: ", unit.name);
+    }
+  }
+
+}
 
 canvas.onmousedown = function(e) {
   keys[e.button] = true;
@@ -191,18 +240,16 @@ canvas.onmousedown = function(e) {
       let x = Math.round(getCanvasPosition(e.offsetX));
       let y = Math.round(getCanvasPosition(e.offsetY));
 
-      let targetUnit = getUnit(player2, x, y);
+      let targetUnit = getUnit(getOpponent(playerActive), x, y);
 
       for (let unit of playerActive.units) {
         if (unit.selected) {
           unit.targetAttack = targetUnit;
-          //unit.target = {x, y}
-          //unit.field = field;
         }
       }
       
       inputMode = "NORMAL";
-      console.log("Input mode: ", inputMode);
+      // console.log("Input mode: ", inputMode);
   } else {
       if (e.button == 0) {
         let x = Math.round(getCanvasPosition(e.offsetX));
@@ -261,6 +308,7 @@ canvas.oncontextmenu = function(e) {
     if (unit.selected) {
       unit.target = {x, y}
       unit.field = field;
+      console.log("MOVE CMD ISSUED: ", unit.name, x, y);
     }
   }
 }
@@ -280,18 +328,22 @@ window.onkeydown = function (e) {
   keys[e.keyCode] = true;
 
   if (sayKeys) {
-     console.log("Key down:", e.keyCode);
+      console.log("Key down:", e.keyCode);
   }
-  if (keys[KEY_S]) {                           //  's' key
-    switchActivePlayer();
+  if (keys[KEY_TILDE]) {                           //  's' key
+      switchActivePlayer();
   }
   if (keys[KEY_SPACE]) {
-    togglePause();
+      togglePause();
   }
   if (keys[KEY_A]) {
       inputMode = "ATTACK";
-      console.log("Input mode: ", inputMode);
+      // console.log("Input mode: ", inputMode);
   }
+  if (keys[KEY_S]) {
+      stopUnits(); 
+  }
+
 }
 
 window.onkeyup = function (e) {
@@ -303,3 +355,4 @@ window.onkeyup = function (e) {
 
 }
 </script>
+</html>

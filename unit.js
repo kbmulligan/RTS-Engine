@@ -7,10 +7,13 @@ const DEFAULT_DEFENSE = 10;
 const DEFAULT_COLOR = "gray";
 const DEFAULT_SIZE = 8;
 const THRESHOLD_CLOSE = 0.5;
+const THRESHOLD_ARROW = 3;
 const WEAPON_LENGTH = 1.5;
 const ARCHER_CHANCE = 0.3;
 const ARROW_SIZE = 4;
+const ARROW_SPEED = 3;
 const ARROW_COLOR = "red";
+const COOLDOWN = 50;             // attack cooldown in game ticks
 
 const MAX_PROJECTILES = 3;
 
@@ -25,6 +28,15 @@ function Projectile (x, y, speed, tx, ty) {
   this.color = ARROW_COLOR;
   this.completed = false;
 
+  // set these parameters in stone because they "shouldn't change" later
+  let dx = this.target.x - this.x;
+  let dy = this.target.y - this.y;
+  let hyp = Math.sqrt(dx*dx + dy*dy);
+  dx /= hyp;
+  dy /= hyp;
+  this.vx = dx * this.maxv;
+  this.vy = dy * this.maxv;
+
   this.idString = Math.floor(Math.random() * 10000).toString().padStart(5,'0');
   this.name = this.color + "-" +  "PROJECTILE" + "-" + this.idString; 
 
@@ -37,21 +49,12 @@ function Projectile (x, y, speed, tx, ty) {
   } 
 
   this.update = function() {
-      let dx = this.target.x - this.x;
-      let dy = this.target.y - this.y;
-      let hyp = Math.sqrt(dx*dx + dy*dy);
-      dx /= hyp;
-      dy /= hyp;
-
-      this.vx = dx * this.maxv;
-      this.vy = dy * this.maxv;
-
       this.x += this.vx;
       this.y += this.vy;
      
-      if (closeToPts(this, this.target, 2)) {
+      if (closeToPts(this, this.target, THRESHOLD_ARROW)) {
           // projectile has reached the end of its flight path and should probably be removed
-          console.log(this.name, "MADE IT TO DESTINATION");
+          // console.log(this.name, "MADE IT TO DESTINATION");
           this.completed = true;
       }
   }
@@ -73,7 +76,7 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.direction = 2 * Math.random() * Math.PI;
 
   this.ammo = 50;
-
+  this.cooldown = 0;
   this.projectiles = [];
 
   this.type = "SOLDIER";     // one of SOLDIER, ARCHER
@@ -202,10 +205,20 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
 
     }
 
+    // update attack cooldown
+    if (this.cooldown > 0) {
+        this.cooldown -= this.attackSpeed;
+        this.cooldown = Math.max(this.cooldown, 0);
+    } 
 
-    if (this.targetAttack && this.projectiles.length < MAX_PROJECTILES) {
-        this.projectiles.push(new Projectile(this.x, this.y, 5, 
-                              this.targetAttack.x, this.targetAttack.y));
+    // shoot an arrow if circumstances allow
+    if (this.targetAttack && this.cooldown == 0 && this.projectiles.length < MAX_PROJECTILES) {
+        if (this.ammo > 0) { 
+            this.cooldown = COOLDOWN;
+            this.ammo -= 1;
+            this.projectiles.push(new Projectile(this.x, this.y, ARROW_SPEED, 
+                                  this.targetAttack.x, this.targetAttack.y));
+        }
     }
 
     // work on moving toward target if the unit has one
@@ -277,6 +290,13 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   }
 }
 
+// return distance between 2 pts given by pythagoream theorem
+function distance(pt1, pt2) {
+  let dx = pt1.x - pt2.x;
+  let dy = pt1.y - pt2.y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
 function closeTo(a, b, threshold = THRESHOLD_CLOSE) {
   return Math.abs(a-b) <= threshold;
 }
@@ -294,3 +314,5 @@ function withinGridSpace(pt1, pt2) {
   if (j1 != j2) return false;
   return true;
 }
+
+
