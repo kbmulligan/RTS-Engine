@@ -74,6 +74,7 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.selected = false;
   this.field = getField(Math.floor(this.y/B), Math.floor(this.x/B));
   this.direction = 2 * Math.random() * Math.PI;
+  this.facing = this.direction;
 
   this.ammo = 50;
   this.cooldown = 0;
@@ -91,12 +92,23 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.attackRange = DEFAULT_ATTACK_RANGE;
   this.attackSpeed = DEFAULT_ATTACK_SPEED;
 
-  this.state = "INACTIVE";    // one of INACTIVE, MOVING, ATTACKING
+  this.state = "INACTIVE";    // one of INACTIVE, MOVING, ATTACKING, DEAD
   
   this.getLocation = function() {
     return {x: this.x, y: this.y};
   }
 
+  this.setMoveTarget = function(moveTo) {
+     this.target = moveTo;
+  }
+
+  this.setAttackTarget = function(targetUnit) {
+      this.targetAttack = targetUnit;
+      if (this.targetAttack) {
+          this.facing = Math.atan(this.targetAttack.y - this.y, this.targetAttack.x - this.x);
+      }
+  }
+  
   this.resetDirection = function() {
     this.direction = 2 * Math.random() * Math.PI;
   }
@@ -135,6 +147,15 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
       ctx.stroke();
       ctx.lineWidth = temp;
     }
+    if (this.state == "DEAD") {
+      ctx.strokeStyle = "BLACK";
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, TAU);
+      let temp = ctx.lineWidth;
+      ctx.lineWidth = 6
+      ctx.stroke();
+      ctx.lineWidth = temp;
+    }
 
     
   }
@@ -145,8 +166,8 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
     ctx.beginPath();
     if (this.type == "SOLDIER") {
         ctx.moveTo(this.x,this.y);
-        ctx.lineTo(Math.cos(this.direction) * mag * this.r + this.x, 
-                   Math.sin(this.direction) * mag * this.r + this.y);
+        ctx.lineTo(Math.cos(this.facing) * mag * this.r + this.x, 
+                   Math.sin(this.facing) * mag * this.r + this.y);
 
         let temp = ctx.lineWidth;
         ctx.lineWidth = 3;
@@ -155,12 +176,12 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
     }
     if (this.type == "ARCHER") {
         ctx.moveTo(this.x,this.y);
-        ctx.lineTo(Math.cos(this.direction) * 0.7 * mag * this.r + this.x, 
-                   Math.sin(this.direction) * 0.7 * mag * this.r + this.y);
+        ctx.lineTo(Math.cos(this.facing) * 0.7 * mag * this.r + this.x, 
+                   Math.sin(this.facing) * 0.7 * mag * this.r + this.y);
         ctx.moveTo(this.x,this.y);
-        ctx.arc(this.x, this.y, this.r * mag, this.direction, this.direction - 0.2*TAU, true);
+        ctx.arc(this.x, this.y, this.r * mag, this.facing, this.facing - 0.2*TAU, true);
         ctx.moveTo(this.x,this.y);
-        ctx.arc(this.x, this.y, this.r * mag, this.direction, this.direction + 0.2*TAU, false);
+        ctx.arc(this.x, this.y, this.r * mag, this.facing, this.facing + 0.2*TAU, false);
 
         let temp = ctx.lineWidth;
         ctx.lineWidth = 3;
@@ -192,6 +213,10 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
 
   this.update = function() {
 
+    if (this.hp > 0) {
+        
+    }
+
     // update projectiles if the unit has them
     if (this.projectiles) {
         this.projectiles.forEach( function (item, index) {
@@ -219,6 +244,13 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
             this.projectiles.push(new Projectile(this.x, this.y, ARROW_SPEED, 
                                   this.targetAttack.x, this.targetAttack.y));
         }
+    }
+
+    // update facing direction if has target
+    if (this.targetAttack) {
+      this.facing = Math.atan2(this.targetAttack.y - this.y, this.targetAttack.x - this.x);
+    } else {
+      this.facing = this.direction;
     }
 
     // work on moving toward target if the unit has one
