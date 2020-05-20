@@ -1,5 +1,7 @@
+// unit.js - everything regarding units, projectiles, and similar
+
 const TAU = 2 * Math.PI;
-const DEFAULT_HP = 10;
+const DEFAULT_HP = 100;
 const DEFAULT_ATTACK = 10;
 const DEFAULT_ATTACK_RANGE = 100;
 const DEFAULT_ATTACK_SPEED = 1;
@@ -9,24 +11,28 @@ const DEFAULT_SIZE = 8;
 const THRESHOLD_CLOSE = 0.5;
 const THRESHOLD_ARROW = 3;
 const WEAPON_LENGTH = 1.5;
-const ARCHER_CHANCE = 0.3;
-const ARROW_SIZE = 4;
+const ARCHER_CHANCE = 0.5;
+const ARROW_LENGTH = 5;
+const ARROW_WIDTH = 3;
 const ARROW_SPEED = 3;
 const ARROW_COLOR = "red";
 const COOLDOWN = 50;             // attack cooldown in game ticks
 
 const MAX_PROJECTILES = 3;
 
-function Projectile (x, y, speed, tx, ty) {
+function Projectile (x, y, speed, tx, ty, owner) {
   this.x = x;
   this.y = y;
-  this.r = ARROW_SIZE;
+  this.size = ARROW_LENGTH;
   this.vx = 0;
   this.vy = 0;
   this.maxv = speed;
   this.target = {x: tx, y: ty};
   this.color = ARROW_COLOR;
+  this.visible = true;
   this.completed = false;
+  this.owner = owner;
+  this.damage = owner.attack;
 
   // set these parameters in stone because they "shouldn't change" later
   let dx = this.target.x - this.x;
@@ -37,18 +43,31 @@ function Projectile (x, y, speed, tx, ty) {
   this.vx = dx * this.maxv;
   this.vy = dy * this.maxv;
 
+  this.direction = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+
   this.idString = Math.floor(Math.random() * 10000).toString().padStart(5,'0');
   this.name = this.color + "-" +  "PROJECTILE" + "-" + this.idString; 
 
   this.draw = function(ctx) {
     //console.log("Trying to draw: ", this.name);
-    ctx.fillStyle = this.color;
+    //ctx.fillStyle = this.color;
+
+    ctx.strokeStyle = this.color;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, TAU);
-    ctx.fill();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x + Math.cos(this.direction) * this.size * 3, 
+               this.y + Math.sin(this.direction) * this.size * 3);
+    let temp = ctx.lineWidth;
+    ctx.lineWidth = ARROW_WIDTH;
+    ctx.stroke();
+    ctx.lineWidth = temp;
+    ctx.stroke();
+
+    //ctx.arc(this.x, this.y, this.size, 0, TAU);
+    //ctx.fill();
   } 
 
-  this.update = function() {
+  this.update = function(world) {
       this.x += this.vx;
       this.y += this.vy;
      
@@ -57,11 +76,47 @@ function Projectile (x, y, speed, tx, ty) {
           // console.log(this.name, "MADE IT TO DESTINATION");
           this.completed = true;
       }
+
+      let hitSomething = this.collides(world);
+      if (hitSomething.length > 0) {
+          hitSomething.forEach( u => u.injure(this.damage) );
+          this.completed = true;
+          //console.log("I STILL THINK I HIT SOMETHING");
+      }
   }
+
+  // returns the items it collides with, if any
+  //     if there is no collision, the return is a null object
+  this.collides = function(environment) {
+
+      let checkUnits = [].concat(environment.players[0].units, environment.players[1].units);
+
+      // remove owner of projectile
+      checkUnits = checkUnits.filter( u => u != this.owner); 
+
+      let distanceThreshold = 30;
+      let collisions = [];
+      for(let i of checkUnits) {
+
+          // BROAD COLLISION CHECK
+          if (distance(this, i) < distanceThreshold) {
+              //console.log("THIS IS CLOSE, SHOULD CHECK: ", i, this);
+              
+              // NARROW COLLISION CHECK 
+              if (i.contains(this.x, this.y)) {
+                  //console.log("THIS WAS HIT: ", i, this);
+                  collisions.push(i);
+              }
+          } 
+      }
+
+      return collisions;
+  }
+  
 
 }
 
-function Unit(x, y, color, r=DEFAULT_SIZE) {
+function Unit(x, y, owner, r=DEFAULT_SIZE) {
   this.x = x;
   this.y = y;
   this.r = r;
@@ -70,18 +125,19 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.maxv = 1;
   this.target = {x: this.x, y: this.y};
   this.targetAttack = null;
-  this.color = color;
+  this.color = owner.color;
   this.selected = false;
   this.field = getField(Math.floor(this.y/B), Math.floor(this.x/B));
   this.direction = 2 * Math.random() * Math.PI;
   this.facing = this.direction;
+  this.visible = true;
 
   this.ammo = 50;
   this.cooldown = 0;
   this.projectiles = [];
 
   this.type = "SOLDIER";     // one of SOLDIER, ARCHER
-  if (Math.random() > ARCHER_CHANCE) {
+  if (Math.random() < ARCHER_CHANCE) {
       this.type = "ARCHER";
   }
   this.idString = Math.floor(Math.random() * 10000).toString().padStart(5,'0');
@@ -92,14 +148,16 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
   this.attackRange = DEFAULT_ATTACK_RANGE;
   this.attackSpeed = DEFAULT_ATTACK_SPEED;
 
+  this.autofire = true;       // will this unit attack if a valid target is in range?
+
   this.state = "INACTIVE";    // one of INACTIVE, MOVING, ATTACKING, DEAD
   
   this.getLocation = function() {
     return {x: this.x, y: this.y};
   }
 
-  this.setMoveTarget = function(moveTo) {
-     this.target = moveTo;
+  this.setMoveTarget = function(moveToPt) {
+     this.target = moveToPt;
   }
 
   this.setAttackTarget = function(targetUnit) {
@@ -113,8 +171,15 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
     this.direction = 2 * Math.random() * Math.PI;
   }
 
+  this.injure = function(dmg) {
+      this.hp -= dmg;
+      this.hp = Math.max(this.hp, 0);
+  }
+
   this.contains = function(x,y) {
+
     //square collision
+
     let dx = Math.abs(this.x - x)
     if (dx > this.r) return false;
     let dy = Math.abs(this.y - y)
@@ -162,7 +227,7 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
 
   this.drawWeapon = function(ctx) {
     let mag = WEAPON_LENGTH;
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = this.color;
     ctx.beginPath();
     if (this.type == "SOLDIER") {
         ctx.moveTo(this.x,this.y);
@@ -211,16 +276,16 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
     return vec;
   }
 
-  this.update = function() {
+  this.update = function(world) {
 
     if (this.hp > 0) {
-        
+        ;
     }
 
     // update projectiles if the unit has them
     if (this.projectiles) {
         this.projectiles.forEach( function (item, index) {
-            item.update();
+            item.update(world);
         });
 
         // check each projectile for being complete
@@ -242,7 +307,7 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
             this.cooldown = COOLDOWN;
             this.ammo -= 1;
             this.projectiles.push(new Projectile(this.x, this.y, ARROW_SPEED, 
-                                  this.targetAttack.x, this.targetAttack.y));
+                                  this.targetAttack.x, this.targetAttack.y, this));
         }
     }
 
@@ -311,9 +376,12 @@ function Unit(x, y, color, r=DEFAULT_SIZE) {
       this.vx = dirx / hyp;
       this.vy = diry / hyp;
     }
+
+    // set velocity
     this.vx *= this.maxv;
     this.vy *= this.maxv;
 
+    // move
     this.x += this.vx;
     this.y += this.vy;
     

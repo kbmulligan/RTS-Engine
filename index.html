@@ -27,6 +27,7 @@ var gameState = "PAUSED";               // one of "PAUSED" or "RUNNING"
 var sayKeys = true;
 var inputMode = "NORMAL";               // one of "NORMAL" or "ATTACK"
 var gameTime = 0;
+let world = {};                         // holds global game state
 
 const GAME_SPEED = 1;
 
@@ -76,25 +77,24 @@ var player1 = {
   units: []
 };
 
-for (let i = 0; i < MAX_UNITS; i++) {
-  let x = Math.floor(Math.random() * W)
-  let y = Math.floor(Math.random() * W)
-  player1.units.push(new Unit(x, y, player1.color))
-}
   
 var player2 = {
   name: "Player 2",
   color: "green",
   units: []
 };
-  
-for (let i = 0; i < MAX_UNITS; i++) {
-  let x = Math.floor(Math.random() * W)
-  let y = Math.floor(Math.random() * W)
-  player2.units.push(new Unit(x, y, player2.color))
+
+world.players = [player1, player2];
+let playerActive = player1;
+
+function generateUnits (player) {
+    for (let i = 0; i < MAX_UNITS; i++) {
+      let x = Math.floor(Math.random() * W)
+      let y = Math.floor(Math.random() * W)
+      player.units.push(new Unit(x, y, player))
+    }
 }
 
-var playerActive = player1;
 
 // UTILITY FUNCTIONS /////////////////////////////////////////////////
 
@@ -177,8 +177,30 @@ function drawSelectionBox(ctx) {
 
 // ASSET UPDATES ////////////////////////////////////////////////////
 function update() {
-  player1.units.forEach(unit => unit.update());
-  player2.units.forEach(unit => unit.update());
+    player1.units.forEach(unit => unit.update(world));
+    player2.units.forEach(unit => unit.update(world));
+
+    //checkProjectiles(world); 
+}
+
+
+// NOT USED CURRENTLY
+function checkProjectiles (world) {
+
+    if (projectiles) {
+        // broad search (get all units close to projectile p)
+        for (let p of projectiles) {
+            let closeUnits = player1.units.filter(u => closeToPts(u, p) < 50);
+
+            // narrow search
+            for (let u of closeUnits) {
+                if (u.contains(p.x, p.y)) {
+                    console.log("HIT: ", p, u);
+                    u.hp = 0;
+                }
+            }
+        }
+    }
 }
 
 
@@ -195,6 +217,9 @@ function tick(t) {
 
 // START HERE ///////////////////////////////////////////////////////
 // Everything begins here then goes into main game loop 
+
+generateUnits(player1);
+generateUnits(player2);
 
 console.log("MAP: ", mapName);
 console.log("GAMESTATE: ", gameState);
