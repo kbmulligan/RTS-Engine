@@ -1,10 +1,11 @@
 // unit.js - everything regarding units, projectiles, and similar
 
 const TAU = 2 * Math.PI;
-const DEFAULT_HP = 100;
+const DEFAULT_HP = 50;
 const DEFAULT_ATTACK = 10;
 const DEFAULT_ATTACK_RANGE = 100;
 const DEFAULT_ATTACK_SPEED = 1;
+const DEFAULT_SIGHT_RANGE = 250;
 const DEFAULT_DEFENSE = 10;
 const DEFAULT_COLOR = "gray";
 const DEFAULT_SIZE = 8;
@@ -49,22 +50,19 @@ function Projectile (x, y, speed, tx, ty, owner) {
   this.name = this.color + "-" +  "PROJECTILE" + "-" + this.idString; 
 
   this.draw = function(ctx) {
-    //console.log("Trying to draw: ", this.name);
-    //ctx.fillStyle = this.color;
+    if (this.visible) {
+        //console.log("Trying to draw: ", this.name);
 
-    ctx.strokeStyle = this.color;
-    ctx.beginPath();
-    ctx.moveTo(this.x, this.y);
-    ctx.lineTo(this.x + Math.cos(this.direction) * this.size * 3, 
-               this.y + Math.sin(this.direction) * this.size * 3);
-    let temp = ctx.lineWidth;
-    ctx.lineWidth = ARROW_WIDTH;
-    ctx.stroke();
-    ctx.lineWidth = temp;
-    ctx.stroke();
-
-    //ctx.arc(this.x, this.y, this.size, 0, TAU);
-    //ctx.fill();
+        ctx.strokeStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + Math.cos(this.direction) * this.size * 3, 
+                   this.y + Math.sin(this.direction) * this.size * 3);
+        let temp = ctx.lineWidth;
+        ctx.lineWidth = ARROW_WIDTH;
+        ctx.stroke();
+        ctx.lineWidth = temp;
+    }
   } 
 
   this.update = function(world) {
@@ -115,8 +113,11 @@ function Projectile (x, y, speed, tx, ty, owner) {
   
 
 }
+// END PROJECTILE ///////////////////////////////////////////////////
 
 function Unit(x, y, owner, r=DEFAULT_SIZE) {
+
+  this.owner = owner;
   this.x = x;
   this.y = y;
   this.r = r;
@@ -131,14 +132,16 @@ function Unit(x, y, owner, r=DEFAULT_SIZE) {
   this.direction = 2 * Math.random() * Math.PI;
   this.facing = this.direction;
   this.visible = true;
+  this.sight = DEFAULT_SIGHT_RANGE;
 
-  this.ammo = 50;
+  this.ammo = 0;
   this.cooldown = 0;
   this.projectiles = [];
 
   this.type = "SOLDIER";     // one of SOLDIER, ARCHER
   if (Math.random() < ARCHER_CHANCE) {
       this.type = "ARCHER";
+      this.ammo += 50;
   }
   this.idString = Math.floor(Math.random() * 10000).toString().padStart(5,'0');
   this.name = this.color + "-" +  this.type + "-" + this.idString; 
@@ -150,21 +153,28 @@ function Unit(x, y, owner, r=DEFAULT_SIZE) {
 
   this.autofire = true;       // will this unit attack if a valid target is in range?
 
-  this.state = "INACTIVE";    // one of INACTIVE, MOVING, ATTACKING, DEAD
+  this.state = "INACTIVE";    // one of INACTIVE, ALERT, MOVING, ATTACKING, DEAD
   
   this.getLocation = function() {
     return {x: this.x, y: this.y};
   }
 
   this.setMoveTarget = function(moveToPt) {
-     this.target = moveToPt;
+      this.target = moveToPt;
+      if (this.target) {
+          this.state = "MOVING";
+      }
+      //console.log("MOVE CMD ISSUED: ", this.name, this.target);
   }
 
   this.setAttackTarget = function(targetUnit) {
       this.targetAttack = targetUnit;
       if (this.targetAttack) {
           this.facing = Math.atan(this.targetAttack.y - this.y, this.targetAttack.x - this.x);
+          this.state = "ATTACKING";
       }
+
+     //console.log("ATTACK CMD ISSUED: ", this.name, this.targetAttack);
   }
   
   this.resetDirection = function() {
@@ -174,6 +184,27 @@ function Unit(x, y, owner, r=DEFAULT_SIZE) {
   this.injure = function(dmg) {
       this.hp -= dmg;
       this.hp = Math.max(this.hp, 0);
+
+      if (this.hp == 0) {
+          this.state = "DEAD";
+          this.maxv = 0;
+      }
+  } 
+
+  this.hasAmmo = function() {
+      return this.ammo > 0;
+  }
+
+  this.inRange = function(target) {
+      return distance(this, target) < this.attackRange;
+  }
+
+  this.isDead = function() {
+      return this.hp <= 0;
+  }
+
+  this.isAlert = function() {
+      return this.state == "ALERT";
   }
 
   this.contains = function(x,y) {
@@ -188,6 +219,8 @@ function Unit(x, y, owner, r=DEFAULT_SIZE) {
   }
 
   this.draw = function(ctx) {
+    if (this.visible) {
+    
     ctx.fillStyle = this.color;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, this.direction+0.10*TAU, this.direction+TAU-0.10*TAU);
@@ -221,8 +254,7 @@ function Unit(x, y, owner, r=DEFAULT_SIZE) {
       ctx.stroke();
       ctx.lineWidth = temp;
     }
-
-    
+    } 
   }
 
   this.drawWeapon = function(ctx) {
@@ -276,12 +308,50 @@ function Unit(x, y, owner, r=DEFAULT_SIZE) {
     return vec;
   }
 
+
+  // returns list of enemy units within radius "sight"
+  this.scan = function(w) {
+
+      // find opponent
+      let oppos = w.players.filter( p => p != this.owner); 
+
+      // *should* only be one
+      let oppo = oppos.pop();
+      
+      let checkUnits = oppo.units;
+
+      // remove owner of projectile
+      //checkUnits = checkUnits.filter( u => u.owner != this.owner); 
+
+      let detected = [];
+      for(let i of checkUnits) {
+
+          // BROAD COLLISION CHECK
+          if (distance(this, i) < this.sight) {
+              //console.log("THIS IS IN MY RANGE, SHOULD CHECK: ", i, this);
+              detected.push(i);
+          } 
+          //console.log("SCAN: ", i.name, detected.length); 
+      }
+
+      return detected;
+  }
+
+  this.shoot = function () {
+      if (this.targetAttack) {
+          this.cooldown = COOLDOWN;
+          this.ammo -= 1;
+          this.projectiles.push(new Projectile(this.x, this.y, ARROW_SPEED, 
+                              this.targetAttack.x, this.targetAttack.y, this));
+      } else {
+          console.log("ILLEGAL SHOT: NO TARGET", this);
+      }
+  }
+
   this.update = function(world) {
 
-    if (this.hp > 0) {
-        ;
-    }
-
+    // DO REGARDLESS OF UNIT STATE
+ 
     // update projectiles if the unit has them
     if (this.projectiles) {
         this.projectiles.forEach( function (item, index) {
@@ -295,100 +365,134 @@ function Unit(x, y, owner, r=DEFAULT_SIZE) {
 
     }
 
+    // reset attack target if it's dead
+    if (this.targetAttack) {
+        if (this.targetAttack.isDead()) {
+            this.setAttackTarget(null); 
+            this.state = "ALERT";
+        }
+    }
+
     // update attack cooldown
     if (this.cooldown > 0) {
         this.cooldown -= this.attackSpeed;
         this.cooldown = Math.max(this.cooldown, 0);
     } 
 
-    // shoot an arrow if circumstances allow
-    if (this.targetAttack && this.cooldown == 0 && this.projectiles.length < MAX_PROJECTILES) {
-        if (this.ammo > 0) { 
-            this.cooldown = COOLDOWN;
-            this.ammo -= 1;
-            this.projectiles.push(new Projectile(this.x, this.y, ARROW_SPEED, 
-                                  this.targetAttack.x, this.targetAttack.y, this));
+
+    if (this.isDead()) {
+        // DO ONLY IF UNIT IS DEAD 
+
+        // immobilize
+        this.maxv = 0;
+
+        // remove targets
+        this.targetAttack = null; 
+        this.target = null; 
+
+    } else {
+        // DO ONLY IF UNIT IS ALIVE
+
+        // shoot an arrow if circumstances allow
+        if (this.state == "ATTACKING" &&
+            this.targetAttack && 
+            this.cooldown == 0 && 
+            this.hasAmmo() &&
+            this.inRange(this.targetAttack) &&
+            this.projectiles.length < MAX_PROJECTILES) {
+
+            this.shoot();
+        }
+
+        // update facing direction if has target
+        if (this.targetAttack) {
+          this.facing = Math.atan2(this.targetAttack.y - this.y, this.targetAttack.x - this.x);
+        } else {
+          this.facing = this.direction;
+
+          if (this.isAlert()) {
+              let targetList = this.scan(world);
+              if (targetList.length > 0) {
+                  this.targetAttack = getRandom(targetList);
+              }
+          }
+        }
+
+        // work on moving toward target if the unit has one
+        if (this.target == null) {
+          return
+        }
+        if (withinGridSpace(this.getLocation(), this.target)) {
+          if (closeToPts(this.getLocation(), this.target)) {
+            this.vx = 0;
+            this.vy = 0;
+            this.target = null;
+
+            //console.log("Unit arrived: ", this.name, this.target);
+            this.state = "ALERT";
+            return
+          }
+          
+
+          let dx = this.target.x - this.x;
+          let dy = this.target.y - this.y;
+          let hyp = Math.sqrt(dx*dx + dy*dy);
+          dx /= hyp;
+          dy /= hyp;
+          this.vx = dx * this.maxv;
+          this.vy = dy * this.maxv;
+
+          this.direction = Math.atan2(this.vy, this.vx);
+
+          this.x += this.vx;
+          this.y += this.vy;
+
+          return
+        }
+
+        let fj = Math.floor((this.x - this.r) / B);
+        let fi = Math.floor((this.y - this.r) / B);
+        let cj = Math.ceil((this.x - this.r) / B);
+        let ci = Math.ceil((this.y - this.r) / B);
+        
+        let v1 = this.getFieldVector(fi, fj);
+        let v2 = this.getFieldVector(fi, cj);
+        let v3 = this.getFieldVector(ci, fj);
+        let v4 = this.getFieldVector(ci, cj);
+
+        let xWeight = (this.x - this.r) / B - fj;
+        let topx = v1.x * (1-xWeight) +  v2.x * xWeight;
+        let topy = v1.y * (1-xWeight) +  v2.y * xWeight;
+        let botx = v3.x * (1-xWeight) +  v4.x * xWeight;
+        let boty = v3.y * (1-xWeight) +  v4.y * xWeight;
+        
+        let yWeight = (this.y - this.r) / B - fi;
+
+        let dirx = topx * (1-yWeight) + botx * yWeight;
+        let diry = topy * (1-yWeight) + boty * yWeight;
+
+        let hyp = Math.sqrt(dirx*dirx + diry*diry)
+
+        if (!closeTo(hyp,0)){
+          this.vx = dirx / hyp;
+          this.vy = diry / hyp;
+        }
+
+        // set velocity
+        this.vx *= this.maxv;
+        this.vy *= this.maxv;
+
+        // move
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        this.direction = Math.atan2(this.vy, this.vx);
+        //console.log(this.direction, this.x, this.y);
         }
     }
 
-    // update facing direction if has target
-    if (this.targetAttack) {
-      this.facing = Math.atan2(this.targetAttack.y - this.y, this.targetAttack.x - this.x);
-    } else {
-      this.facing = this.direction;
-    }
-
-    // work on moving toward target if the unit has one
-    if (this.target == null) {
-      return
-    }
-    if (withinGridSpace(this.getLocation(), this.target)) {
-      if (closeToPts(this.getLocation(), this.target)) {
-        this.vx = 0;
-        this.vy = 0;
-        this.target = null;
-        //console.log("Unit arrived: ", this.name, this.target);
-        return
-      }
-      
-
-      let dx = this.target.x - this.x;
-      let dy = this.target.y - this.y;
-      let hyp = Math.sqrt(dx*dx + dy*dy);
-      dx /= hyp;
-      dy /= hyp;
-      this.vx = dx * this.maxv;
-      this.vy = dy * this.maxv;
-
-      this.direction = Math.atan2(this.vy, this.vx);
-
-      this.x += this.vx;
-      this.y += this.vy;
-
-
-      return
-    }
-
-    let fj = Math.floor((this.x - this.r) / B);
-    let fi = Math.floor((this.y - this.r) / B);
-    let cj = Math.ceil((this.x - this.r) / B);
-    let ci = Math.ceil((this.y - this.r) / B);
-    
-    let v1 = this.getFieldVector(fi, fj);
-    let v2 = this.getFieldVector(fi, cj);
-    let v3 = this.getFieldVector(ci, fj);
-    let v4 = this.getFieldVector(ci, cj);
-
-    let xWeight = (this.x - this.r) / B - fj;
-    let topx = v1.x * (1-xWeight) +  v2.x * xWeight;
-    let topy = v1.y * (1-xWeight) +  v2.y * xWeight;
-    let botx = v3.x * (1-xWeight) +  v4.x * xWeight;
-    let boty = v3.y * (1-xWeight) +  v4.y * xWeight;
-    
-    let yWeight = (this.y - this.r) / B - fi;
-
-    let dirx = topx * (1-yWeight) + botx * yWeight;
-    let diry = topy * (1-yWeight) + boty * yWeight;
-
-    let hyp = Math.sqrt(dirx*dirx + diry*diry)
-
-    if (!closeTo(hyp,0)){
-      this.vx = dirx / hyp;
-      this.vy = diry / hyp;
-    }
-
-    // set velocity
-    this.vx *= this.maxv;
-    this.vy *= this.maxv;
-
-    // move
-    this.x += this.vx;
-    this.y += this.vy;
-    
-    this.direction = Math.atan2(this.vy, this.vx);
-    //console.log(this.direction, this.x, this.y);
-  }
 }
+// END UNIT /////////////////////////////////////////////////////////
 
 // return distance between 2 pts given by pythagoream theorem
 function distance(pt1, pt2) {
@@ -415,4 +519,6 @@ function withinGridSpace(pt1, pt2) {
   return true;
 }
 
-
+function getRandom(list) {
+  return list[Math.floor(Math.random()*list.length)];
+}

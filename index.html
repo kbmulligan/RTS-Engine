@@ -313,12 +313,13 @@ canvas.onmouseup = function(e) {
 
       for (let unit of playerActive.units) {
         if (unit.selected) {
-          unit.targetAttack = targetUnit;
+          unit.setAttackTarget(targetUnit);
         }
       }
       
       inputMode = "NORMAL";
       // console.log("Input mode: ", inputMode);
+
   } else {
       if (e.button == 0) {
         let x = Math.round(getCanvasPosition(e.offsetX));
